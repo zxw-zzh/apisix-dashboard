@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  # APISIX 管理面板前端
+  apisix-admin-panel:
+    build: .
+    container_name: apisix-admin-panel
+    ports:
+      - "8080:80"
+    volumes:
+      # 配置文件挂载
+      - ./config:/usr/share/nginx/html/config:ro
+      # 日志挂载
+      - ./logs:/var/log/nginx
+    environment:
+      - NGINX_HOST=localhost
+      - NGINX_PORT=80
+    restart: unless-stopped
+    # 使用桥接网络模式，确保端口映射正常工作
+    # network_mode: host  # 注释掉，避免在Windows上的兼容性问题
+
+# 如果使用自定义网络，取消注释以下内容
+# networks:
+#   apisix-network:
+#     external: true
+#     name: 01_apisix_backend_default  # 使用您现有的网络名称

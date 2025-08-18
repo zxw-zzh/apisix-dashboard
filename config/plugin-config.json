@@ -1,0 +1,778 @@
+{
+  "plugins": {
+    "ai": {
+      "ai-proxy-custom": {
+        "title": "AI Proxy Custom",
+        "desc": "AI代理信息检测。",
+        "icon": "mdi-robot",
+        "color": "info",
+        "enabled": true
+      },
+      "ai-proxy": {
+        "title": "AI Proxy",
+        "desc": "统一AI代理，支持多家模型服务聚合",
+        "icon": "mdi-robot",
+        "color": "info",
+        "enabled": true
+      },
+      "ai-proxy-multi": {
+        "title": "AI Proxy Multi",
+        "desc": "多模型路由与熔断",
+        "icon": "mdi-robot",
+        "color": "info",
+        "enabled": true
+      },
+      "ai-rate-limiting": {
+        "title": "AI 限速",
+        "desc": "按模型/租户限流",
+        "icon": "mdi-robot",
+        "color": "info",
+        "enabled": true
+      },
+      "ai-prompt-guard": {
+        "title": "Prompt 审计",
+        "desc": "提示词治理与越狱防护",
+        "icon": "mdi-robot",
+        "color": "info",
+        "enabled": true
+      },
+      "ai-aws-content-moderation": {
+        "title": "AWS 内容审核",
+        "desc": "集成AWS内容安全",
+        "icon": "mdi-robot",
+        "color": "info",
+        "enabled": true
+      },
+      "ai-prompt-decorator": {
+        "title": "Prompt 装饰器",
+        "desc": "自动拼接系统提示词模板",
+        "icon": "mdi-robot",
+        "color": "info",
+        "enabled": true
+      },
+      "ai-prompt-template": {
+        "title": "Prompt 模板",
+        "desc": "模板管理与插值",
+        "icon": "mdi-robot",
+        "color": "info",
+        "enabled": true
+      },
+      "ai-rag": {
+        "title": "RAG",
+        "desc": "检索增强生成",
+        "icon": "mdi-robot",
+        "color": "info",
+        "enabled": true
+      },
+      "ai-request-rewrite": {
+        "title": "请求改写",
+        "desc": "在转发前动态改写AI请求",
+        "icon": "mdi-robot",
+        "color": "info",
+        "enabled": true
+      }
+    },
+                    "auth": {
+                    "key-auth": {
+                        "title": "Key认证",
+                        "desc": "基于API Key的认证",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    },
+                    "jwt-auth": {
+                        "title": "JWT认证",
+                        "desc": "基于JWT Token的认证",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    },
+                    "jwe-decrypt": {
+                        "title": "JWE解密",
+                        "desc": "JWE Token解密",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    },
+                    "basic-auth": {
+                        "title": "基础认证",
+                        "desc": "用户名密码基础认证",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    },
+                    "authz-keycloak": {
+                        "title": "Keycloak授权",
+                        "desc": "基于Keycloak的授权",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    },
+                    "authz-casdoor": {
+                        "title": "Casdoor授权",
+                        "desc": "基于Casdoor的授权",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    },
+                    "wolf-rbac": {
+                        "title": "Wolf RBAC",
+                        "desc": "基于角色的访问控制",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    },
+                    "openid-connect": {
+                        "title": "OpenID Connect",
+                        "desc": "OpenID Connect认证",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    },
+                    "cas-auth": {
+                        "title": "CAS认证",
+                        "desc": "CAS单点登录认证",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    },
+                    "hmac-auth": {
+                        "title": "HMAC认证",
+                        "desc": "基于HMAC的认证",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    },
+                    "authz-casbin": {
+                        "title": "Casbin授权",
+                        "desc": "基于Casbin的授权",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    },
+                    "ldap-auth": {
+                        "title": "LDAP认证",
+                        "desc": "LDAP目录服务认证",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    },
+                    "opa": {
+                        "title": "OPA授权",
+                        "desc": "基于OPA的策略授权",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    },
+                    "forward-auth": {
+                        "title": "转发认证",
+                        "desc": "转发认证请求",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    },
+                    "multi-auth": {
+                        "title": "多重认证",
+                        "desc": "支持多种认证方式",
+                        "icon": "mdi-key",
+                        "color": "primary",
+                        "enabled": true
+                    }
+                },
+                    "security": {
+                    "cors": {
+                        "title": "CORS",
+                        "desc": "跨域资源共享控制",
+                        "icon": "mdi-shield-outline",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "uri-blocker": {
+                        "title": "URI Blocker",
+                        "desc": "URI路径阻止",
+                        "icon": "mdi-shield-outline",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "ip-restriction": {
+                        "title": "IP限制",
+                        "desc": "基于IP地址的访问控制",
+                        "icon": "mdi-shield-outline",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "ua-restriction": {
+                        "title": "UA限制",
+                        "desc": "基于User-Agent的访问控制",
+                        "icon": "mdi-shield-outline",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "referer-restriction": {
+                        "title": "Referer限制",
+                        "desc": "基于Referer的访问控制",
+                        "icon": "mdi-shield-outline",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "consumer-restriction": {
+                        "title": "消费者限制",
+                        "desc": "基于消费者的访问控制",
+                        "icon": "mdi-shield-outline",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "csrf": {
+                        "title": "CSRF",
+                        "desc": "跨站请求伪造防护",
+                        "icon": "mdi-shield-outline",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "public-api": {
+                        "title": "公开API",
+                        "desc": "公开API访问控制",
+                        "icon": "mdi-shield-outline",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "GM": {
+                        "title": "GM",
+                        "desc": "GM安全控制",
+                        "icon": "mdi-shield-outline",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "chaitin-waf": {
+                        "title": "长亭WAF",
+                        "desc": "长亭Web应用防火墙",
+                        "icon": "mdi-shield-outline",
+                        "color": "secondary",
+                        "enabled": true
+                    }
+                },
+                    "traffic": {
+                    "limit-req": {
+                        "title": "限流",
+                        "desc": "请求频率限制",
+                        "icon": "mdi-speedometer",
+                        "color": "warning",
+                        "enabled": true
+                    },
+                    "limit-conn": {
+                        "title": "连接限制",
+                        "desc": "并发连接数限制",
+                        "icon": "mdi-speedometer",
+                        "color": "warning",
+                        "enabled": true
+                    },
+                    "limit-count": {
+                        "title": "计数限制",
+                        "desc": "请求计数限制",
+                        "icon": "mdi-speedometer",
+                        "color": "warning",
+                        "enabled": true
+                    },
+                    "proxy-cache": {
+                        "title": "代理缓存",
+                        "desc": "响应内容缓存",
+                        "icon": "mdi-speedometer",
+                        "color": "warning",
+                        "enabled": true
+                    },
+                    "request-validation": {
+                        "title": "请求验证",
+                        "desc": "请求参数验证",
+                        "icon": "mdi-speedometer",
+                        "color": "warning",
+                        "enabled": true
+                    },
+                    "proxy-mirror": {
+                        "title": "代理镜像",
+                        "desc": "请求镜像转发",
+                        "icon": "mdi-speedometer",
+                        "color": "warning",
+                        "enabled": true
+                    },
+                    "api-breaker": {
+                        "title": "API熔断器",
+                        "desc": "API服务熔断保护",
+                        "icon": "mdi-speedometer",
+                        "color": "warning",
+                        "enabled": true
+                    },
+                    "traffic-split": {
+                        "title": "流量分割",
+                        "desc": "流量分割与路由",
+                        "icon": "mdi-speedometer",
+                        "color": "warning",
+                        "enabled": true
+                    },
+                    "request-id": {
+                        "title": "请求ID",
+                        "desc": "请求唯一标识",
+                        "icon": "mdi-speedometer",
+                        "color": "warning",
+                        "enabled": true
+                    },
+                    "proxy-control": {
+                        "title": "代理控制",
+                        "desc": "代理行为控制",
+                        "icon": "mdi-speedometer",
+                        "color": "warning",
+                        "enabled": true
+                    },
+                    "client-control": {
+                        "title": "客户端控制",
+                        "desc": "客户端行为控制",
+                        "icon": "mdi-speedometer",
+                        "color": "warning",
+                        "enabled": true
+                    },
+                    "workflow": {
+                        "title": "工作流",
+                        "desc": "请求处理工作流",
+                        "icon": "mdi-speedometer",
+                        "color": "warning",
+                        "enabled": true
+                    }
+                },
+                    "observe": {
+                    "prometheus": {
+                        "title": "Prometheus",
+                        "desc": "Prometheus指标收集",
+                        "icon": "mdi-chart-bar",
+                        "color": "info",
+                        "enabled": true
+                    },
+                    "skywalking": {
+                        "title": "SkyWalking",
+                        "desc": "SkyWalking链路追踪",
+                        "icon": "mdi-chart-bar",
+                        "color": "info",
+                        "enabled": true
+                    },
+                    "zipkin": {
+                        "title": "Zipkin",
+                        "desc": "Zipkin分布式链路追踪",
+                        "icon": "mdi-chart-bar",
+                        "color": "info",
+                        "enabled": true
+                    },
+                    "opentelemetry": {
+                        "title": "OpenTelemetry",
+                        "desc": "OpenTelemetry可观测性",
+                        "icon": "mdi-chart-bar",
+                        "color": "info",
+                        "enabled": true
+                    },
+                    "datadog": {
+                        "title": "Datadog",
+                        "desc": "Datadog监控集成",
+                        "icon": "mdi-chart-bar",
+                        "color": "info",
+                        "enabled": true
+                    },
+                    "node-status": {
+                        "title": "节点状态",
+                        "desc": "节点状态监控",
+                        "icon": "mdi-chart-bar",
+                        "color": "info",
+                        "enabled": true
+                    }
+                                },
+                "serverless": {
+                    "serverless": {
+                        "title": "Serverless",
+                        "desc": "无服务器函数",
+                        "icon": "mdi-function-variant",
+                        "color": "success",
+                        "enabled": true
+                    },
+                    "azure-functions": {
+                        "title": "Azure Functions",
+                        "desc": "Azure函数计算",
+                        "icon": "mdi-function-variant",
+                        "color": "success",
+                        "enabled": true
+                    },
+                    "openwhisk": {
+                        "title": "OpenWhisk",
+                        "desc": "Apache OpenWhisk",
+                        "icon": "mdi-function-variant",
+                        "color": "success",
+                        "enabled": true
+                    },
+                    "aws-lambda": {
+                        "title": "AWS Lambda",
+                        "desc": "AWS Lambda函数",
+                        "icon": "mdi-function-variant",
+                        "color": "success",
+                        "enabled": true
+                    },
+                    "openfunction": {
+                        "title": "OpenFunction",
+                        "desc": "OpenFunction函数",
+                        "icon": "mdi-function-variant",
+                        "color": "success",
+                        "enabled": true
+                    }
+                },
+                                "log": {
+                    "http-logger": {
+                        "title": "HTTP日志",
+                        "desc": "HTTP请求响应日志",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "skywalking-logger": {
+                        "title": "SkyWalking日志",
+                        "desc": "SkyWalking日志收集",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "tcp-logger": {
+                        "title": "TCP日志",
+                        "desc": "TCP协议日志",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "kafka-logger": {
+                        "title": "Kafka日志",
+                        "desc": "日志发送到Kafka",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "rocketmq-logger": {
+                        "title": "RocketMQ日志",
+                        "desc": "日志发送到RocketMQ",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "udp-logger": {
+                        "title": "UDP日志",
+                        "desc": "UDP协议日志",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "clickhouse-logger": {
+                        "title": "ClickHouse日志",
+                        "desc": "日志发送到ClickHouse",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "syslog": {
+                        "title": "Syslog",
+                        "desc": "系统日志",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "log-rotate": {
+                        "title": "日志轮转",
+                        "desc": "日志文件轮转",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "error-log-logger": {
+                        "title": "错误日志",
+                        "desc": "错误日志收集",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "sls-logger": {
+                        "title": "SLS日志",
+                        "desc": "阿里云SLS日志",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "google-cloud-logging": {
+                        "title": "Google Cloud Logging",
+                        "desc": "Google Cloud日志",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "splunk-hec-logging": {
+                        "title": "Splunk HEC",
+                        "desc": "Splunk HEC日志",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "file-logger": {
+                        "title": "文件日志",
+                        "desc": "日志写入文件",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "loggly": {
+                        "title": "Loggly",
+                        "desc": "Loggly日志服务",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "elasticsearch-logger": {
+                        "title": "Elasticsearch日志",
+                        "desc": "日志发送到ES",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "tencent-cloud-cls": {
+                        "title": "腾讯云CLS",
+                        "desc": "腾讯云日志服务",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "loki-logger": {
+                        "title": "Loki日志",
+                        "desc": "Grafana Loki日志",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "lago": {
+                        "title": "Lago",
+                        "desc": "Lago日志服务",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    },
+                    "token-counter": {
+                        "title": "Token计数器",
+                        "desc": "Token使用量统计",
+                        "icon": "mdi-file-document",
+                        "color": "dark",
+                        "enabled": true
+                    }
+                },
+                    "transform": {
+                    "response-rewrite": {
+                        "title": "响应改写",
+                        "desc": "动态修改响应内容",
+                        "icon": "mdi-sync",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "proxy-rewrite": {
+                        "title": "代理改写",
+                        "desc": "动态修改代理请求",
+                        "icon": "mdi-sync",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "grpc-transcode": {
+                        "title": "gRPC转码",
+                        "desc": "gRPC协议转码",
+                        "icon": "mdi-sync",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "grpc-web": {
+                        "title": "gRPC-Web",
+                        "desc": "gRPC-Web协议支持",
+                        "icon": "mdi-sync",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "fault-injection": {
+                        "title": "故障注入",
+                        "desc": "故障注入测试",
+                        "icon": "mdi-sync",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "mocking": {
+                        "title": "Mock服务",
+                        "desc": "模拟服务响应",
+                        "icon": "mdi-sync",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "degraphql": {
+                        "title": "DeGraphQL",
+                        "desc": "GraphQL协议处理",
+                        "icon": "mdi-sync",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "webassembly": {
+                        "title": "WebAssembly",
+                        "desc": "WebAssembly执行",
+                        "icon": "mdi-sync",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "body-transformer": {
+                        "title": "Body转换器",
+                        "desc": "请求体转换",
+                        "icon": "mdi-sync",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "attach-consumer-label": {
+                        "title": "消费者标签",
+                        "desc": "附加消费者标签",
+                        "icon": "mdi-sync",
+                        "color": "secondary",
+                        "enabled": true
+                    }
+                },
+                    "general": {
+                    "batch-requests": {
+                        "title": "批量请求",
+                        "desc": "批量请求处理",
+                        "icon": "mdi-cog",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "redirect": {
+                        "title": "重定向",
+                        "desc": "HTTP重定向处理",
+                        "icon": "mdi-cog",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "echo": {
+                        "title": "Echo",
+                        "desc": "请求回显测试",
+                        "icon": "mdi-cog",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "gzip": {
+                        "title": "Gzip压缩",
+                        "desc": "响应Gzip压缩",
+                        "icon": "mdi-cog",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "brotli": {
+                        "title": "Brotli压缩",
+                        "desc": "响应Brotli压缩",
+                        "icon": "mdi-cog",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "real-ip": {
+                        "title": "真实IP",
+                        "desc": "获取真实客户端IP",
+                        "icon": "mdi-cog",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "server-info": {
+                        "title": "服务器信息",
+                        "desc": "服务器信息展示",
+                        "icon": "mdi-cog",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "ext-plugin-pre-req": {
+                        "title": "外部插件预处理",
+                        "desc": "请求前外部插件",
+                        "icon": "mdi-cog",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "ext-plugin-post-req": {
+                        "title": "外部插件后处理",
+                        "desc": "请求后外部插件",
+                        "icon": "mdi-cog",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "ext-plugin-post-resp": {
+                        "title": "外部插件响应后",
+                        "desc": "响应后外部插件",
+                        "icon": "mdi-cog",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "inspect": {
+                        "title": "请求检查",
+                        "desc": "请求内容检查",
+                        "icon": "mdi-cog",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "ocsp-stapling": {
+                        "title": "OCSP装订",
+                        "desc": "OCSP状态装订",
+                        "icon": "mdi-cog",
+                        "color": "secondary",
+                        "enabled": true
+                    }
+                                },
+                "other": {
+                    "dubbo-proxy": {
+                        "title": "Dubbo代理",
+                        "desc": "Dubbo协议代理",
+                        "icon": "mdi-dots-horizontal",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "mqtt-proxy": {
+                        "title": "MQTT代理",
+                        "desc": "MQTT协议代理",
+                        "icon": "mdi-dots-horizontal",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "kafka-proxy": {
+                        "title": "Kafka代理",
+                        "desc": "Kafka协议代理",
+                        "icon": "mdi-dots-horizontal",
+                        "color": "secondary",
+                        "enabled": true
+                    },
+                    "http-dubbo": {
+                        "title": "HTTP-Dubbo",
+                        "desc": "HTTP到Dubbo转换",
+                        "icon": "mdi-dots-horizontal",
+                        "color": "secondary",
+                        "enabled": true
+                    }
+                }
+            },
+                        "categories": {
+                "all": "全部",
+                "ai": "AI插件",
+                "auth": "认证插件",
+                "security": "安全插件",
+                "traffic": "流量控制插件",
+                "observe": "可观测性插件",
+                "serverless": "无服务插件",
+                "log": "日志插件",
+                "transform": "转换插件",
+                "general": "通用插件",
+                "other": "其他插件"
+            },
+            "categoryIcons": {
+                "all": "mdi-puzzle",
+                "ai": "mdi-robot",
+                "auth": "mdi-key",
+                "security": "mdi-shield-outline",
+                "traffic": "mdi-speedometer",
+                "observe": "mdi-chart-bar",
+                "serverless": "mdi-function-variant",
+                "log": "mdi-file-document",
+                "transform": "mdi-sync",
+                "general": "mdi-cog",
+                "other": "mdi-dots-horizontal"
+            }
+}

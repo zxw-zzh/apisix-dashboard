@@ -1,0 +1,19 @@
+{
+  "etcd": {
+    "hosts": ["http://localhost:2379"],
+    "prefix": "/apisix",
+    "timeout": 30,
+    "username": "",
+    "password": "",
+    "tls": {
+      "enabled": false,
+      "cert_file": "",
+      "key_file": "",
+      "ca_file": ""
+    }
+  },
+  "apisix": {
+    "admin_url": "http://localhost:9180",
+    "api_key": "edd1c9f034335f136f87ad84b625c8f1"
+  }
+}

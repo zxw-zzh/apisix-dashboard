@@ -1,0 +1,32 @@
+# Git 相关
+.git
+.gitignore
+
+# 部署文件
+docker-compose*.yml
+Dockerfile
+.dockerignore
+deploy.sh
+deploy.ps1
+
+# 日志文件
+logs/
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE 文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 备份文件
+*.bak
+*.backup

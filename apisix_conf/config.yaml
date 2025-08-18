@@ -1,0 +1,96 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+apisix:
+  node_listen: 9080              # APISIX listening port
+  enable_ipv6: false
+  
+  # 设置日志级别为debug
+  log_level: "debug"
+
+  enable_control: true
+  enable_admin: true
+  enable_dashboard: true
+  control:
+    ip: "0.0.0.0"
+    port: 9092
+
+  # 使用 etcd 模式
+  # enable_standalone: true
+  # standalone:
+  #   config:
+  #     path: "/usr/local/apisix/conf/apisix-standalone.yaml"
+
+  # 使用默认插件路径
+  # extra_lua_path: "/usr/local/apisix/conf/plugins/?.lua;/usr/local/apisix/conf/plugins/apisix/plugins/?.lua"
+  
+  # 设置超时时间（5分钟）
+  proxy_timeout: 300s
+  proxy_connect_timeout: 300s
+  proxy_send_timeout: 300s
+  proxy_read_timeout: 300s
+
+# 插件列表
+plugins:
+  - ai-prompt-guard
+  - ai-proxy-custom
+  - token-counter
+  - key-auth
+  - cors
+  - consumer-restriction
+deployment:
+  admin:
+    allow_admin:               # https://nginx.org/en/docs/http/ngx_http_access_module.html#allow
+      - 0.0.0.0/0              # We need to restrict ip access rules for security. 0.0.0.0/0 is for test.
+
+    admin_key:
+      - name: "admin"
+        key: edd1c9f034335f136f87ad84b625c8f1
+        role: admin                 # admin: manage all configuration data
+
+      - name: "viewer"
+        key: 4054f7cf07e344346cd3f287985e76a2
+        role: viewer
+
+  etcd:
+    host:
+      - "http://etcd:2379"
+    prefix: "/apisix"
+    timeout: 30
+
+plugin_attr:
+  prometheus:
+    export_addr:
+      ip: "0.0.0.0"
+      port: 9091
+
+# Nginx 配置
+nginx_config:
+  http:
+    custom_lua_shared_dicts:
+      - name: "content_safety_cache"
+        size: "10m"
+    lua_shared_dicts:
+      - name: "content_safety_cache"
+        size: "10m"
+    # 设置超时时间
+    client_body_timeout: 300s
+    client_header_timeout: 300s
+    send_timeout: 300s
+    proxy_connect_timeout: 300s
+    proxy_send_timeout: 300s
+    proxy_read_timeout: 300s

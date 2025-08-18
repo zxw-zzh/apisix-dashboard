@@ -1,0 +1,535 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+    <head>
+        <meta charset="utf-8" />
+        <title>APISIX 管理系统 - 登录</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <meta content="Shiny API网关管理系统" name="description" />
+        <meta content="Shiny Admin" name="author" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    
+        <!-- App favicon -->
+        <link rel="shortcut icon" href="assets/images/favicon.ico">
+    
+        <!-- App css -->
+        <link href="assets/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+        <link href="assets/css/icons.min.css" rel="stylesheet" type="text/css" />
+        <link href="assets/css/theme.min.css" rel="stylesheet" type="text/css" />
+    
+        <style>
+            /* 使用更高优先级的选择器来覆盖theme.css */
+            body.login-container {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                min-height: 100vh !important;
+            }
+            
+            /* 确保背景图片不会覆盖我们的渐变背景 */
+            body.login-container.bg-login {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                background-image: none !important;
+            }
+            
+            .login-card {
+                border: none !important;
+                border-radius: 15px !important;
+                box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1) !important;
+                backdrop-filter: blur(10px) !important;
+                background: rgba(255, 255, 255, 0.95) !important;
+                margin: 2rem auto !important;
+                max-width: 450px !important;
+                overflow: hidden !important;
+                position: relative !important;
+            }
+            
+            .login-header {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                color: white !important;
+                border-radius: 15px 15px 0 0 !important;
+                padding: 2rem !important;
+                margin: 0 !important;
+                text-align: center !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            
+            .login-header h3 {
+                color: white !important;
+                margin-bottom: 0.5rem !important;
+            }
+            
+            .login-header p {
+                color: rgba(255, 255, 255, 0.8) !important;
+                margin-bottom: 0 !important;
+            }
+            
+            .form-control {
+                border-radius: 10px !important;
+                border: 2px solid #e9ecef !important;
+                padding: 12px 15px !important;
+                transition: all 0.3s ease !important;
+                font-size: 14px !important;
+            }
+            
+            .form-control:focus {
+                border-color: #667eea !important;
+                box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
+                outline: none !important;
+            }
+            
+            .btn-login {
+                border-radius: 10px !important;
+                padding: 12px !important;
+                font-weight: 600 !important;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                border: none !important;
+                transition: all 0.3s ease !important;
+                color: white !important;
+                font-size: 16px !important;
+            }
+            
+            .btn-login:hover {
+                transform: translateY(-2px) !important;
+                box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3) !important;
+                background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
+            }
+            
+            .btn-login:disabled {
+                opacity: 0.7 !important;
+                transform: none !important;
+            }
+            
+            .alert {
+                border-radius: 10px !important;
+                border: none !important;
+                margin-bottom: 1rem !important;
+            }
+            
+            .alert-danger {
+                background-color: #f8d7da !important;
+                color: #721c24 !important;
+                border-left: 4px solid #dc3545 !important;
+            }
+            
+            .alert-success {
+                background-color: #d4edda !important;
+                color: #155724 !important;
+                border-left: 4px solid #28a745 !important;
+            }
+            
+            .loading-spinner {
+                display: none !important;
+            }
+            
+            .loading .loading-spinner {
+                display: inline-block !important;
+            }
+            
+            .loading .btn-text {
+                display: none !important;
+            }
+            
+            .form-label {
+                color: #495057 !important;
+                font-weight: 600 !important;
+                margin-bottom: 0.5rem !important;
+            }
+            
+            .custom-control-input:checked ~ .custom-control-label::before {
+                background-color: #667eea !important;
+                border-color: #667eea !important;
+            }
+            
+            .text-white-50 {
+                color: rgba(255, 255, 255, 0.7) !important;
+            }
+            
+            .text-white-50 a {
+                color: rgba(255, 255, 255, 0.9) !important;
+                text-decoration: none !important;
+            }
+            
+            .text-white-50 a:hover {
+                color: white !important;
+                text-decoration: underline !important;
+            }
+            
+            /* 响应式设计 */
+            @media (max-width: 768px) {
+                .login-card {
+                    margin: 1rem !important;
+                    max-width: none !important;
+                }
+                
+                .login-header {
+                    padding: 1.5rem !important;
+                }
+                
+                .card-body {
+                    padding: 1.5rem !important;
+                }
+            }
+            
+            /* 确保完美对齐 */
+            .card-body {
+                padding: 2rem !important;
+                margin: 0 !important;
+            }
+            
+            .login-header h3 {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            .login-header p {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+        </style>
+    </head>
+
+<body class="login-container" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;">
+
+    <div>
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex align-items-center min-vh-100">
+                        <div class="w-100 d-block my-5">
+                            <div class="row justify-content-center">
+                                <div class="col-md-8 col-lg-5">
+                                     <div class="card login-card" style="background: rgba(255, 255, 255, 0.95) !important; backdrop-filter: blur(10px) !important; border: none !important; border-radius: 15px !important; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1) !important; overflow: hidden !important; position: relative !important;">
+                                        <div class="login-header text-center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; color: white !important; border-radius: 15px 15px 0 0 !important; padding: 2rem !important; margin: 0 !important; width: 100% !important;">
+                                            <h3 class="mb-2">
+                                                <i class="mdi mdi-shield-check me-2"></i>
+                                                ShinyGateWay
+                                            </h3>
+                                            <p class="mb-0 opacity-75">API网关配置管理平台</p>
+                                        </div>
+                                        <div class="card-body" style="padding: 2rem !important; margin: 0 !important;">
+                                            <!-- 登录表单 -->
+                                            <form id="loginForm" class="needs-validation" novalidate>
+                                                <!-- 错误提示 -->
+                                                <div id="loginAlert" class="alert alert-danger" style="display: none;">
+                                                    <i class="mdi mdi-alert-circle me-2"></i>
+                                                    <span id="loginErrorText"></span>
+                                                </div>
+                                                
+                                                <!-- 成功提示 -->
+                                                <div id="loginSuccess" class="alert alert-success" style="display: none;">
+                                                    <i class="mdi mdi-check-circle me-2"></i>
+                                                    登录成功，正在跳转...
+                                                </div>
+
+                                                <div class="form-group mb-3">
+                                                    <label for="username" class="form-label fw-bold" style="color: #495057 !important; font-weight: 600 !important; margin-bottom: 0.5rem !important;">
+                                                        <i class="mdi mdi-account me-1"></i>用户名
+                                                    </label>
+                                                    <input class="form-control" type="text" id="username" name="username" 
+                                                           required placeholder="请输入用户名" autocomplete="username" style="border-radius: 10px !important; border: 2px solid #e9ecef !important; padding: 12px 15px !important; font-size: 14px !important;">
+                                                    <div class="invalid-feedback">
+                                                        请输入用户名
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="form-group mb-3">
+                                                    <label for="password" class="form-label fw-bold" style="color: #495057 !important; font-weight: 600 !important; margin-bottom: 0.5rem !important;">
+                                                        <i class="mdi mdi-lock me-1"></i>密码
+                                                    </label>
+                                                    <input class="form-control" type="password" id="password" name="password" 
+                                                           required placeholder="请输入密码" autocomplete="current-password" style="border-radius: 10px !important; border: 2px solid #e9ecef !important; padding: 12px 15px !important; font-size: 14px !important;">
+                                                    <div class="invalid-feedback">
+                                                        请输入密码
+                                                    </div>
+                                                </div>
+            
+                                                <div class="form-group mb-4">
+                                                    <div class="custom-control custom-checkbox checkbox-primary">
+                                                        <input type="checkbox" class="custom-control-input" id="rememberMe" style="accent-color: #667eea !important;">
+                                                        <label class="custom-control-label" for="rememberMe" style="color: #495057 !important; font-weight: 500 !important;">记住我</label>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <button class="btn btn-login btn-primary w-100" type="submit" id="loginBtn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; border: none !important; border-radius: 10px !important; padding: 12px !important; font-weight: 600 !important; color: white !important; font-size: 16px !important;">
+                                                        <span class="loading-spinner spinner-border spinner-border-sm me-2" role="status"></span>
+                                                        <span class="btn-text">登录</span>
+                                                    </button>
+                                                </div>
+                                            </form>
+                                            
+                                            <!-- 快速登录提示 -->
+                                            <div class="text-center mt-3">
+                                                <small class="text-muted" style="color: #6c757d !important; font-size: 13px !important;">
+                                                    演示账号: admin / admin123
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row mt-4">
+                                        <div class="col-sm-12 text-center">
+                                            <p class="text-white-50 mb-0" style="color: rgba(255, 255, 255, 0.7) !important;">
+                                                还没有账号？ 
+                                                <a href="#" class="text-white-50 ml-1" onclick="showRegisterInfo()" style="color: rgba(255, 255, 255, 0.9) !important; text-decoration: none !important;">
+                                                    <b>注册账号</b>
+                                                </a>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- jQuery  -->
+    <script src="assets/js/jquery.min.js"></script>
+    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/metismenu.min.js"></script>
+    <script src="assets/js/waves.js"></script>
+    <script src="assets/js/simplebar.min.js"></script>
+
+    <!-- App js -->
+    <script src="assets/js/theme.js"></script>
+
+    <!-- 登录功能脚本 -->
+    <script>
+        class LoginManager {
+            constructor() {
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                this.checkRememberedUser();
+                this.setupFormValidation();
+            }
+
+            bindEvents() {
+                const loginForm = document.getElementById('loginForm');
+                const loginBtn = document.getElementById('loginBtn');
+
+                if (loginForm) {
+                    loginForm.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        this.handleLogin();
+                    });
+                }
+
+                // 回车键登录
+                document.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.handleLogin();
+                    }
+                });
+            }
+
+            setupFormValidation() {
+                // Bootstrap 表单验证
+                const forms = document.querySelectorAll('.needs-validation');
+                Array.from(forms).forEach(form => {
+                    form.addEventListener('submit', event => {
+                        if (!form.checkValidity()) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                        }
+                        form.classList.add('was-validated');
+                    });
+                });
+            }
+
+            async handleLogin() {
+                const username = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value.trim();
+                const rememberMe = document.getElementById('rememberMe').checked;
+
+                // 表单验证
+                if (!username || !password) {
+                    this.showError('请填写完整的登录信息');
+                    return;
+                }
+
+                // 显示加载状态
+                this.setLoadingState(true);
+                this.hideAlerts();
+
+                try {
+                    // 模拟登录验证（实际项目中这里应该调用后端API）
+                    const success = await this.validateCredentials(username, password);
+                    
+                    if (success) {
+                        // 保存登录状态
+                        this.saveLoginState(username, rememberMe);
+                        
+                        // 显示成功消息
+                        this.showSuccess();
+                        
+                        // 延迟跳转到管理页面
+                        setTimeout(() => {
+                            this.redirectToAdmin();
+                        }, 1500);
+                    } else {
+                        this.showError('用户名或密码错误');
+                    }
+                } catch (error) {
+                    this.showError('登录失败，请稍后重试');
+                    console.error('Login error:', error);
+                } finally {
+                    this.setLoadingState(false);
+                }
+            }
+
+            async validateCredentials(username, password) {
+                // 模拟API调用延迟
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // 演示账号验证
+                if (username === 'admin' && password === 'admin123') {
+                    return true;
+                }
+                
+                // 其他用户名密码组合（实际项目中这里应该调用后端验证）
+                if (username === 'user' && password === 'user123') {
+                    return true;
+                }
+                
+                return false;
+            }
+
+            saveLoginState(username, rememberMe) {
+                // 保存登录状态到 localStorage - 兼容两种存储方式
+                const loginData = {
+                    username: username,
+                    isLoggedIn: true,
+                    loginTime: new Date().toISOString(),
+                    rememberMe: rememberMe
+                };
+                
+                // 保存到apisixLoginData（原有方式）
+                localStorage.setItem('apisixLoginData', JSON.stringify(loginData));
+                
+                // 同时保存到独立键（兼容admin.html）
+                localStorage.setItem('isLoggedIn', 'true');
+                localStorage.setItem('userEmail', username);
+                localStorage.setItem('userToken', 'demo-token-' + Date.now());
+                
+                // 如果选择记住我，保存到 sessionStorage
+                if (rememberMe) {
+                    sessionStorage.setItem('apisixLoginData', JSON.stringify(loginData));
+                }
+            }
+
+            checkRememberedUser() {
+                // 检查是否有记住的用户信息
+                const rememberedData = localStorage.getItem('apisixLoginData');
+                if (rememberedData) {
+                    try {
+                        const data = JSON.parse(rememberedData);
+                        if (data.rememberMe && data.isLoggedIn) {
+                            document.getElementById('username').value = data.username || '';
+                            document.getElementById('rememberMe').checked = true;
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse remembered data:', e);
+                    }
+                }
+            }
+
+            setLoadingState(loading) {
+                const loginBtn = document.getElementById('loginBtn');
+                if (loading) {
+                    loginBtn.classList.add('loading');
+                    loginBtn.disabled = true;
+                } else {
+                    loginBtn.classList.remove('loading');
+                    loginBtn.disabled = false;
+                }
+            }
+
+            showError(message) {
+                const alert = document.getElementById('loginAlert');
+                const errorText = document.getElementById('loginErrorText');
+                
+                if (alert && errorText) {
+                    errorText.textContent = message;
+                    alert.style.display = 'block';
+                    
+                    // 自动隐藏错误提示
+                    setTimeout(() => {
+                        alert.style.display = 'none';
+                    }, 5000);
+                }
+            }
+
+            showSuccess() {
+                const success = document.getElementById('loginSuccess');
+                if (success) {
+                    success.style.display = 'block';
+                }
+            }
+
+            hideAlerts() {
+                const alert = document.getElementById('loginAlert');
+                const success = document.getElementById('loginSuccess');
+                
+                if (alert) alert.style.display = 'none';
+                if (success) success.style.display = 'none';
+            }
+
+            redirectToAdmin() {
+                // 跳转到管理页面
+                window.location.href = 'admin.html';
+            }
+        }
+
+        // 显示注册信息
+        function showRegisterInfo() {
+            alert('请联系系统管理员创建账号\n\n演示账号：\n用户名：admin\n密码：admin123');
+        }
+
+        // 页面加载完成后初始化登录管理器
+        document.addEventListener('DOMContentLoaded', () => {
+            new LoginManager();
+        });
+
+        // 检查是否已经登录
+        function checkLoginStatus() {
+            // 检查两种存储方式
+            let isLoggedIn = localStorage.getItem('isLoggedIn');
+            let userEmail = localStorage.getItem('userEmail');
+            
+            // 如果没有直接存储，尝试从apisixLoginData中获取
+            if (!isLoggedIn || !userEmail) {
+                const loginData = localStorage.getItem('apisixLoginData');
+                if (loginData) {
+                    try {
+                        const data = JSON.parse(loginData);
+                        if (data.isLoggedIn) {
+                            isLoggedIn = data.isLoggedIn;
+                            userEmail = data.username;
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse login data:', e);
+                    }
+                }
+            }
+            
+            // 如果已经登录，直接跳转到管理页面
+            if (isLoggedIn && userEmail) {
+                window.location.href = 'admin.html';
+            }
+        }
+
+        // 页面加载时检查登录状态
+        checkLoginStatus();
+    </script>
+
+</body>
+
+</html>
