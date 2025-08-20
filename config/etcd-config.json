@@ -1,6 +1,6 @@
 {
   "etcd": {
-    "hosts": ["http://localhost:2379"],
+    "hosts": ["http://113.44.57.186:2379"],
     "prefix": "/apisix",
     "timeout": 30,
     "username": "",
@@ -13,7 +13,7 @@
     }
   },
   "apisix": {
-    "admin_url": "http://localhost:9180",
+    "admin_url": "http://113.44.57.186:9180",
     "api_key": "edd1c9f034335f136f87ad84b625c8f1"
   }
 }

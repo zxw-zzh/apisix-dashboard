@@ -5,10 +5,15 @@
 class EtcdClient {
     constructor(config) {
         this.config = config || {};
-        // 写死etcd地址为Docker环境地址
-        this.baseUrl = 'http://localhost:2379';  // 你的etcd Docker容器地址
-        this.prefix = '/plugin_templates';  // 写死前缀
-        this.apisixPrefix = '/apisix';  // 写死APISIX前缀
+        // 使用运行时配置或同源反代，避免混合内容与CORS
+        const origin = (typeof window !== 'undefined' && window.location && window.location.origin)
+            ? window.location.origin.replace(/\/$/, '')
+            : '';
+        const runtime = (typeof window !== 'undefined' && window.RUNTIME_CONFIG) ? window.RUNTIME_CONFIG : {};
+        // 优先 RUNTIME_CONFIG.ETCD_BASE_URL（如有），否则使用同源 /etcd 反代
+        this.baseUrl = (runtime.ETCD_BASE_URL && runtime.ETCD_BASE_URL.replace(/\/$/, '')) || (origin ? origin + '/etcd' : '');
+        this.prefix = '/plugin_templates';
+        this.apisixPrefix = '/apisix';
         
         // 不设置默认模板，让用户自己创建
         if (!this.config.plugin_templates) {
@@ -483,12 +488,16 @@ class EtcdClient {
      */
     updateConfig(newConfig) {
         this.config = { ...this.config, ...newConfig };
-        // 保持写死的地址不变
-        // this.baseUrl = 'http://localhost:2379';  // 固定etcd地址
-        // this.prefix = '/plugin_templates';  // 固定前缀
-        // this.apisixPrefix = '/apisix';  // 固定APISIX前缀
-        
-        console.log('etcd客户端配置已更新，但地址保持固定:', {
+        if (newConfig.baseUrl) {
+            this.baseUrl = newConfig.baseUrl.replace(/\/$/, '');
+        }
+        if (newConfig.prefix) {
+            this.prefix = newConfig.prefix;
+        }
+        if (newConfig.apisixPrefix) {
+            this.apisixPrefix = newConfig.apisixPrefix;
+        }
+        console.log('etcd客户端配置已更新:', {
             baseUrl: this.baseUrl,
             prefix: this.prefix,
             apisixPrefix: this.apisixPrefix

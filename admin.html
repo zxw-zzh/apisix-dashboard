@@ -17,6 +17,9 @@
         <link href="assets/css/icons.min.css" rel="stylesheet" type="text/css" />
         <link href="assets/css/theme.min.css" rel="stylesheet" type="text/css" />
 
+        <!-- Runtime config (injected via env to runtime-config.js) -->
+        <script src="config/runtime-config.js"></script>
+
         <!-- Custom styles for header layout -->
         <style>
             #page-topbar {
@@ -211,16 +214,16 @@
             .topnav {
                 background-color: #e8f5e8 !important;
                 border-bottom: 1px solid #d4edda;
-                padding: 12px 0 !important;
+                padding: 10px 0 4px !important;
                 min-height: 60px !important;
             }
             
             .topnav .navbar-nav .nav-link {
                 color: #2d5a2d !important;
                 transition: all 0.3s ease;
-                padding: 12px 20px !important;
+                padding: 6px 10px !important;
                 border-radius: 6px;
-                margin: 0 4px;
+                margin: 0;
                 font-size: 14px;
                 font-weight: 500;
             }
@@ -317,6 +320,12 @@
                 font-weight: 600;
             }
             .modal-body .form-group { margin-bottom: 0.75rem; }
+
+            /* 插件管理卡片描述字体缩小 */
+            #plugin02-list .card-body p.text-muted {
+                font-size: 0.75rem !important;
+                line-height: 1.35 !important;
+            }
 
             /* 系统管理 -> 插件管理02 模态框字体与控件尺寸优化 */
             #plugin02Modal .modal-title { font-size: 1rem; }

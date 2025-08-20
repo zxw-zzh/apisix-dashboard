@@ -16,6 +16,7 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
+            margin: 0;
         }
 
         .container {
@@ -25,16 +26,18 @@
             border-radius: 15px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             overflow: hidden;
-            height: 100vh;
+            min-height: calc(100vh - 40px);
+            max-height: calc(100vh - 40px);
+            display: flex;
+            flex-direction: column;
         }
-
-
 
         .content {
             padding: 20px 40px 40px 40px;
-            height: 100%;
+            flex: 1;
             display: flex;
             flex-direction: column;
+            min-height: 0;
         }
 
         /* 消费者认证配置区域 */
@@ -175,6 +178,55 @@
             margin-bottom: 30px;
             flex: 1;
             min-height: 0;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .container {
+                margin: 10px;
+                max-width: none;
+            }
+            
+            .content {
+                padding: 15px 20px 20px 20px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .chat-container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .auth-form {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .auth-config {
+                padding: 20px;
+            }
+            
+            .content {
+                padding: 10px 15px 15px 15px;
+            }
+        }
+
+        @media (max-height: 600px) {
+            .container {
+                min-height: auto;
+                max-height: none;
+            }
+            
+            .auth-config {
+                padding: 15px;
+                margin-bottom: 15px;
+            }
+            
+            .auth-config h3 {
+                margin-bottom: 15px;
+                font-size: 1.2em;
+            }
         }
 
         .chat-panel {
@@ -508,6 +560,8 @@
             }
         }
     </style>
+    <!-- Runtime config for gateway/base URLs -->
+    <script src="config/runtime-config.js"></script>
 </head>
 <body>
     <div class="container">
@@ -528,6 +582,10 @@
                         <input type="text" id="consumerApiKey" placeholder="例如: 1234567890abcdef" value="1234567890abcdef">
                     </div>
                     <button class="auth-button" onclick="saveConsumerConfig()">保存配置</button>
+                </div>
+                <!-- 状态显示区域 -->
+                <div class="auth-status" id="status">
+                    ℹ️ 系统已就绪，使用本地API模式
                 </div>
             </div>
 
@@ -799,7 +857,9 @@
                 }
                 
                 // 强制使用正确的API URL
-                const apiUrl = 'http://localhost:9080/api/ai-proxy';
+                const apiUrl = (window.RUNTIME_CONFIG && window.RUNTIME_CONFIG.APISIX_GATEWAY_URL)
+                  ? window.RUNTIME_CONFIG.APISIX_GATEWAY_URL + '/api/ai-proxy'
+                  : window.location.origin.replace(/\/$/, '') + '/api/ai-proxy';
                 console.log('使用的API URL:', apiUrl);
                 console.log('消费者认证:', { username, apiKey });
                 
@@ -819,6 +879,52 @@
                 // 处理HTTP状态码
                 console.log('响应状态码:', response.status, '类型:', typeof response.status);
                 console.log('400比较结果:', response.status === 400);
+                // 网关/鉴权错误优先处理，避免被误报为“AI层处理错误”
+                if (response.status == 401 || response.status == "401") {
+                    const errText = await response.text();
+                    conversationHistory.push({
+                        role: "assistant",
+                        content: "🔒 鉴权失败：缺少或无效的 API Key"
+                    });
+                    updateMessageList();
+                    updateInputSafetyInfo("🔒 网关/鉴权：缺少或无效的 API Key");
+                    recordRequest(0, true, false, false);
+                    return;
+                }
+                if (response.status == 403 || response.status == "403") {
+                    const raw = await response.text();
+                    let parsed = null;
+                    try { parsed = JSON.parse(raw); } catch (e) {}
+                    // 如果是我们 AI 插件返回的结构，则归类为 AI 层阻止
+                    if (parsed && parsed.success === false) {
+                        const msg = (parsed.error || parsed.message || '').toString();
+                        const isAISafetyBlock = msg.includes('用户输入中检测到') || msg.includes('AI回复中检测到');
+                        if (isAISafetyBlock) {
+                            conversationHistory.push({
+                                role: "assistant",
+                                content: "🛡️ AI层检测阻止：" + msg
+                            });
+                            updateMessageList();
+                            updateInputSafetyInfo("🛡️ AI层：请求被内容检测阻止");
+                            recordRequest(0, true, true, false);
+                            return;
+                        }
+                    }
+                    // 否则按网关/鉴权 403 处理
+                    const bodyLower = (raw || '').toLowerCase();
+                    let reason = "消费者被拦截（不在白名单或已被禁止）";
+                    if (bodyLower.includes('consumer_name') || bodyLower.includes('forbidden')) {
+                        reason = "消费者被拦截（consumer-restriction）";
+                    }
+                    conversationHistory.push({
+                        role: "assistant",
+                        content: "🚫 网关拒绝访问：" + reason
+                    });
+                    updateMessageList();
+                    updateInputSafetyInfo("🚫 网关：访问被拒绝");
+                    recordRequest(0, true, false, false);
+                    return;
+                }
                 if (response.status == 400 || response.status == "400") {
                     try {
                         const errorData = await response.json();
@@ -1216,33 +1322,37 @@
         function showStatus(message, type = 'info') {
             const statusDiv = document.getElementById('status');
             
+            if (!statusDiv) {
+                console.error('状态显示元素未找到');
+                return;
+            }
+            
             let icon = 'ℹ️';
-            let color = '#17a2b8';
+            
+            // 移除所有状态类
+            statusDiv.classList.remove('success', 'error', 'warning', 'info');
             
             switch (type) {
                 case 'success':
                     icon = '✅';
-                    color = '#28a745';
+                    statusDiv.classList.add('success');
                     break;
                 case 'warning':
                     icon = '⚠️';
-                    color = '#ffc107';
+                    statusDiv.classList.add('warning');
                     break;
                 case 'danger':
                     icon = '❌';
-                    color = '#dc3545';
+                    statusDiv.classList.add('error');
                     break;
                 case 'info':
                 default:
                     icon = 'ℹ️';
-                    color = '#17a2b8';
+                    statusDiv.classList.add('info');
                     break;
             }
             
             statusDiv.innerHTML = `${icon} ${message}`;
-            statusDiv.style.color = color;
-            
-
         }
 
         // 初始化
@@ -1262,6 +1372,34 @@
                     console.error('恢复消费者配置失败:', error);
                 }
             }
+            
+            // 处理窗口大小变化
+            function handleResize() {
+                const container = document.querySelector('.container');
+                const chatContainer = document.querySelector('.chat-container');
+                
+                if (window.innerHeight < 600) {
+                    // 当窗口高度较小时，调整容器高度
+                    container.style.minHeight = 'auto';
+                    container.style.maxHeight = 'none';
+                } else {
+                    // 恢复正常高度
+                    container.style.minHeight = 'calc(100vh - 40px)';
+                    container.style.maxHeight = 'calc(100vh - 40px)';
+                }
+                
+                // 确保聊天容器有足够的最小高度
+                if (chatContainer) {
+                    const minHeight = Math.max(300, window.innerHeight * 0.4);
+                    chatContainer.style.minHeight = `${minHeight}px`;
+                }
+            }
+            
+            // 监听窗口大小变化
+            window.addEventListener('resize', handleResize);
+            
+            // 初始调用一次
+            handleResize();
         });
     </script>
 </body>

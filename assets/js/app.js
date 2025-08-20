@@ -19,18 +19,93 @@ class APISIXAdmin {
         // 初始化插件列表
         this.allPlugins = [];
         
-        // APISIX API配置
+        // APISIX API配置（优先 runtime 配置，其次 localStorage，最后默认值）
+        const runtime = (window.RUNTIME_CONFIG || {});
         const savedConfig = localStorage.getItem('apisixConfig');
-        this.apisixConfig = savedConfig ? JSON.parse(savedConfig) : {
-            baseUrl: 'http://localhost:9180/apisix/admin',
-            timeout: 10000,
+        const stored = savedConfig ? JSON.parse(savedConfig) : {};
+        this.apisixConfig = {
+            baseUrl: (runtime.APISIX_ADMIN_URL || stored.baseUrl || 'http://localhost:9180/apisix/admin'),
+            timeout: stored.timeout || 10000,
             headers: {
                 'Content-Type': 'application/json',
-                'X-API-KEY': 'edd1c9f034335f136f87ad84b625c8f1'
+                'X-API-KEY': (runtime.APISIX_ADMIN_KEY || (stored.headers && stored.headers['X-API-KEY']) || 'edd1c9f034335f136f87ad84b625c8f1')
             }
         };
         
         this.init();
+    }
+
+    // 解析 PEM 证书的 notAfter，有效返回 Date，失败返回 null
+    parseCertificateNotAfter(pem) {
+        try {
+            if (!pem || typeof pem !== 'string') return null;
+            // 提取第一段证书体
+            const match = pem.match(/-----BEGIN CERTIFICATE-----([\s\S]*?)-----END CERTIFICATE-----/);
+            if (!match) return null;
+            const base64 = match[1].replace(/\s+/g, '');
+            const der = this.base64ToArrayBuffer(base64);
+            // 使用原生 SubtleCrypto 不提供 X509 解析，这里实现一个非常轻量的 ASN.1 读取，只定位 notAfter 的 UTCTime/GeneralizedTime
+            const bytes = new Uint8Array(der);
+            const view = { i: 0, b: bytes };
+
+            const readLen = () => {
+                let len = view.b[view.i++];
+                if ((len & 0x80) === 0) return len;
+                const num = len & 0x7f;
+                let out = 0;
+                for (let k = 0; k < num; k++) out = (out << 8) | view.b[view.i++];
+                return out;
+            };
+            const skip = () => { const len = readLen(); view.i += len; };
+            const expect = (tag) => { if (view.b[view.i++] !== tag) throw new Error('asn1 tag'); };
+
+            // Certificate ::= SEQUENCE { tbsCertificate, signatureAlgorithm, signatureValue }
+            expect(0x30); readLen();
+            // tbsCertificate
+            expect(0x30); readLen();
+            // optional version [0] EXPLICIT
+            if (view.b[view.i] === 0xa0) { view.i++; readLen(); expect(0x02); skip(); }
+            // serialNumber, signature, issuer
+            expect(0x02); skip();
+            expect(0x30); skip();
+            expect(0x30); skip();
+            // validity (SEQUENCE of notBefore, notAfter)
+            expect(0x30); const vlen = readLen(); const vEnd = view.i + vlen;
+            // notBefore
+            const nbTag = view.b[view.i++]; const nbLen = readLen(); view.i += nbLen;
+            // notAfter
+            const naTag = view.b[view.i++]; const naLen = readLen();
+            const timeBytes = view.b.slice(view.i, view.i + naLen); view.i += naLen;
+            // UTCTime (0x17) or GeneralizedTime (0x18)
+            let str = new TextDecoder().decode(timeBytes);
+            let d = null;
+            if (naTag === 0x17) {
+                // YYMMDDHHMMSSZ
+                const m = str.match(/^(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})Z$/);
+                if (m) {
+                    const year = Number(m[1]);
+                    const fullYear = year >= 50 ? 1900 + year : 2000 + year;
+                    d = new Date(Date.UTC(fullYear, Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6])));
+                }
+            } else if (naTag === 0x18) {
+                // YYYYMMDDHHMMSSZ
+                const m = str.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})Z$/);
+                if (m) {
+                    d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6])));
+                }
+            }
+            return d && isFinite(d.getTime()) ? d : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    base64ToArrayBuffer(base64) {
+        const binary_string = atob(base64);
+        const len = binary_string.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) bytes[i] = binary_string.charCodeAt(i);
+        return bytes.buffer;
     }
 
     async init() {
@@ -997,6 +1072,9 @@ class APISIXAdmin {
                                             <th class="sortable" data-sort="uri" style="cursor: pointer;">
                                                 URI <i class="mdi mdi-sort"></i>
                                             </th>
+                                            <th class="sortable" data-sort="hosts" style="cursor: pointer;">
+                                                Host <i class="mdi mdi-sort"></i>
+                                            </th>
                                             <th class="sortable" data-sort="methods" style="cursor: pointer;">
                                                 方法 <i class="mdi mdi-sort"></i>
                                             </th>
@@ -1118,6 +1196,16 @@ class APISIXAdmin {
                                                     <label for="route-priority" class="form-label fw-bold">优先级</label>
                                                     <input type="number" class="form-control" id="route-priority" value="0" min="0" max="100" style="font-size: 14px;">
                                                     <div class="form-text">数值越大优先级越高，用于路由匹配顺序</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-12">
+                                                <div class="mb-3">
+                                                    <label for="route-hosts" class="form-label fw-bold">主机名（Host，可选）</label>
+                                                    <input type="text" class="form-control" id="route-hosts" placeholder="api.example.com 或 *.example.com，多个用逗号分隔" style="font-size: 14px;">
+                                                    <div class="form-text">不填写表示不限制 Host；支持通配符（如 *.example.com）。</div>
                                                 </div>
                                             </div>
                                         </div>
@@ -2033,6 +2121,11 @@ class APISIXAdmin {
                         normalized.plugins = {};
                     }
                     
+                    // 统一 hosts/host 字段
+                    if (normalized.host && (!normalized.hosts || !Array.isArray(normalized.hosts) || normalized.hosts.length === 0)) {
+                        normalized.hosts = [normalized.host];
+                    }
+
                     // 处理服务字段：APISIX返回的是service_id，前端期望的是service
                     normalized.service = normalized.service || normalized.service_id || '';
                     
@@ -3294,13 +3387,13 @@ class APISIXAdmin {
     // 加载概览统计页面内容
     loadOverviewContent(contentDiv) {
         contentDiv.innerHTML = `
-            <!-- 系统概览统计 -->
-            <div class="row mb-4">
+            <!-- 系统概览统计和访问链路关系配置 -->
+            <div class="row">
                 <div class="col-12">
                     <div class="card">
                         <div class="card-body">
                             <h4 class="card-title mb-4">
-                                <i class="mdi mdi-chart-line me-2"></i>系统概览统计
+                                <i class="mdi mdi-chart-line" style="margin-right: 1rem !important;"></i>系统概览统计
                             </h4>
                             <p class="text-muted mb-4">APISIX网关系统的整体运行状态和资源配置概览</p>
                             
@@ -3320,7 +3413,7 @@ class APISIXAdmin {
                                                     </div>
                                                 </div>
                                                 <div class="col-auto">
-                                                    <i class="mdi mdi-routes mdi-2x text-primary"></i>
+                                                    <i class="mdi mdi-routes text-primary" style="font-size: 3rem;"></i>
                                                 </div>
                                             </div>
                                         </div>
@@ -3341,7 +3434,7 @@ class APISIXAdmin {
                                                     </div>
                                                 </div>
                                                 <div class="col-auto">
-                                                    <i class="mdi mdi-cog mdi-2x text-success"></i>
+                                                    <i class="mdi mdi-cog text-success" style="font-size: 3rem;"></i>
                                                 </div>
                                             </div>
                                         </div>
@@ -3362,7 +3455,7 @@ class APISIXAdmin {
                                                     </div>
                                                 </div>
                                                 <div class="col-auto">
-                                                    <i class="mdi mdi-server mdi-2x text-info"></i>
+                                                    <i class="mdi mdi-server text-info" style="font-size: 3rem;"></i>
                                                 </div>
                                             </div>
                                         </div>
@@ -3383,7 +3476,7 @@ class APISIXAdmin {
                                                     </div>
                                                 </div>
                                                 <div class="col-auto">
-                                                    <i class="mdi mdi-account-group mdi-2x text-warning"></i>
+                                                    <i class="mdi mdi-account-group text-warning" style="font-size: 3rem;"></i>
                                                 </div>
                                             </div>
                                         </div>
@@ -3404,7 +3497,7 @@ class APISIXAdmin {
                                                     </div>
                                                 </div>
                                                 <div class="col-auto">
-                                                    <i class="mdi mdi-certificate mdi-2x text-danger"></i>
+                                                    <i class="mdi mdi-certificate text-danger" style="font-size: 3rem;"></i>
                                                 </div>
                                             </div>
                                         </div>
@@ -3425,25 +3518,20 @@ class APISIXAdmin {
                                                     </div>
                                                 </div>
                                                 <div class="col-auto">
-                                                    <i class="mdi mdi-puzzle mdi-2x" style="color: #6f42c1;"></i>
+                                                    <i class="mdi mdi-puzzle" style="color: #6f42c1; font-size: 3rem;"></i>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- 访问链路关系配置 -->
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-body">
+                            <!-- 分隔线 -->
+                            <hr class="my-4">
+
+                            <!-- 访问链路关系配置 -->
                             <h4 class="card-title mb-4">
-                                <i class="mdi mdi-sitemap me-2"></i>访问链路关系配置
+                                <i class="mdi mdi-sitemap" style="margin-right: 1rem !important;"></i>访问链路关系配置
                             </h4>
                             <p class="text-muted mb-4">显示系统中所有配置的访问链路关系，包括消费者、路由、服务、上游的完整链路</p>
                             
@@ -3593,14 +3681,16 @@ class APISIXAdmin {
                     <thead class="table-light">
                         <tr>
                             <th class="text-center" style="width: 6%;">序号</th>
-                            <th class="text-center" style="width: 18%;">消费者</th>
-                            <th class="text-center" style="width: 4%;"></th>
-                            <th class="text-center" style="width: 18%;">路由</th>
-                            <th class="text-center" style="width: 4%;"></th>
-                            <th class="text-center" style="width: 18%;">服务</th>
-                            <th class="text-center" style="width: 4%;"></th>
-                            <th class="text-center" style="width: 18%;">上游</th>
-                            <th class="text-center" style="width: 10%;">配置</th>
+                            <th class="text-center" style="width: 14%;">证书</th>
+                            <th class="text-center" style="width: 3%;"></th>
+                            <th class="text-center" style="width: 14%;">消费者</th>
+                            <th class="text-center" style="width: 3%;"></th>
+                            <th class="text-center" style="width: 14%;">路由</th>
+                            <th class="text-center" style="width: 3%;"></th>
+                            <th class="text-center" style="width: 14%;">服务</th>
+                            <th class="text-center" style="width: 3%;"></th>
+                            <th class="text-center" style="width: 14%;">上游</th>
+                            <th class="text-center" style="width: 8%;">配置</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -3609,6 +3699,18 @@ class APISIXAdmin {
                             <tr class="access-chain-row">
                                 <td class="text-center">
                                     <span class="text-dark fw-bold">${index + 1}</span>
+                                </td>
+                                <td class="text-center">
+                                    ${chain.ssl ? 
+                                        ((chain.ssl.snis && chain.ssl.snis.length) ?
+                                            chain.ssl.snis.map(s => `<span class="badge bg-light text-dark me-1">${s}</span>`).join('') :
+                                            `<code>${chain.ssl.id || '已配置'}</code>`
+                                        ) :
+                                        '<span class="text-muted">未配置</span>'
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    <i class="mdi mdi-arrow-right text-muted"></i>
                                 </td>
                                 <td class="text-center">
                                     ${chain.consumer ? 
@@ -3653,6 +3755,8 @@ class APISIXAdmin {
                             <!-- 插件归属行 -->
                             <tr class="plugin-ownership-row">
                                 <td></td>
+                                <td class="text-center"></td>
+                                <td></td>
                                 <td class="text-center">
                                     ${this.renderPluginOwnershipCell(chain, 'consumer')}
                                 </td>
@@ -3673,7 +3777,7 @@ class APISIXAdmin {
                             <!-- 链路分隔行 -->
                             ${index < accessChains.length - 1 ? `
                                 <tr class="chain-separator">
-                                    <td colspan="9" style="height: 20px; background-color: #e9ecef; border: none;"></td>
+                                    <td colspan="11" style="height: 12px; background-color: #e9ecef; border: none;"></td>
                                 </tr>
                             ` : ''}
                         `).join('')}
@@ -3697,11 +3801,11 @@ class APISIXAdmin {
                 }
                 .table td {
                     vertical-align: middle;
-                    padding: 12px 8px;
+                    padding: 8px 6px;
                 }
                 .badge {
                     font-size: 0.8rem;
-                    padding: 6px 10px;
+                    padding: 4px 8px;
                 }
                 .table-responsive {
                     border-radius: 8px;
@@ -3712,11 +3816,11 @@ class APISIXAdmin {
                     border: none;
                 }
                 .plugin-ownership-row td {
-                    padding: 8px;
+                    padding: 4px;
                     border: none;
                 }
                 .plugin-ownership-info {
-                    padding: 4px;
+                    padding: 2px;
                 }
                 .chain-separator {
                     background-color: #e9ecef;
@@ -3821,6 +3925,7 @@ class APISIXAdmin {
                     service: service,
                     upstream: upstream,
                     consumer: consumer,
+                    ssl: this.findMatchingSSLForRoute(route),
                     plugins: route.plugins || {}
                 });
             });
@@ -3833,6 +3938,7 @@ class APISIXAdmin {
                 service: null,
                 upstream: null,
                 consumer: null,
+                ssl: null,
                 plugins: {}
             });
         }
@@ -3846,6 +3952,50 @@ class APISIXAdmin {
         console.log('上游数据总数:', this.upstreamsData ? this.upstreamsData.length : 0);
         
         return chains;
+    }
+
+    // 根据路由的主机名（hosts/host）尝试匹配SSL证书
+    findMatchingSSLForRoute(route) {
+        try {
+            if (!route || !this.sslData || !Array.isArray(this.sslData) || this.sslData.length === 0) return null;
+
+            // 获取可能的主机名集合：优先使用 route.hosts，其次 route.host
+            let hostCandidates = [];
+            if (Array.isArray(route.hosts) && route.hosts.length > 0) {
+                hostCandidates = route.hosts;
+            } else if (typeof route.host === 'string' && route.host.trim()) {
+                hostCandidates = [route.host.trim()];
+            }
+
+            if (hostCandidates.length === 0) return null;
+
+            // 在 sslData 中查找与任一 hostCandidate 匹配的证书
+            for (const ssl of this.sslData) {
+                const snis = Array.isArray(ssl.snis) ? ssl.snis : [];
+                for (const sni of snis) {
+                    for (const host of hostCandidates) {
+                        if (this.isSniMatchHost(sni, host)) {
+                            return ssl;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('匹配SSL证书时出错:', e);
+        }
+        return null;
+    }
+
+    // 判断 SNI 与 host 是否匹配，支持通配符前缀 *.example.com
+    isSniMatchHost(sni, host) {
+        if (!sni || !host) return false;
+        const sniLower = String(sni).toLowerCase();
+        const hostLower = String(host).toLowerCase();
+        if (sniLower.startsWith('*.')) {
+            const suffix = sniLower.slice(1); // like .example.com
+            return hostLower.endsWith(suffix);
+        }
+        return sniLower === hostLower;
     }
 
     // 渲染插件归属单元格
@@ -3918,7 +4068,6 @@ class APISIXAdmin {
                                 <h5 class="modal-title" id="${modalId}-label">
                                     <i class="mdi mdi-code-json me-2"></i>访问链路完整配置 (链路 ${index + 1})
                                 </h5>
-                                <button type="button" class="btn-close" onclick="window.apisixAdmin.closeChainModal(${index})" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
                                 <div class="card">
@@ -3933,7 +4082,6 @@ class APISIXAdmin {
                                 </div>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" onclick="window.apisixAdmin.closeChainModal(${index})">关闭</button>
                                 <button type="button" class="btn btn-primary" onclick="window.apisixAdmin.copyChainJSON(${index})">
                                     <i class="mdi mdi-content-copy me-1"></i>复制JSON
                                 </button>
@@ -3956,6 +4104,38 @@ class APISIXAdmin {
             const modalElement = document.getElementById(modalId);
             const modal = new bootstrap.Modal(modalElement);
             modal.show();
+
+            // 明确绑定头部与底部关闭按钮，避免事件委托失效导致无法关闭
+            try {
+                const headerCloseBtn = modalElement.querySelector('.modal-header .btn-close');
+                const footerCloseBtn = modalElement.querySelector('.modal-footer .btn.btn-secondary');
+                const bindClose = (btn) => {
+                    if (!btn) return;
+                    btn.addEventListener('click', (ev) => {
+                        try { ev.preventDefault(); ev.stopPropagation(); } catch (_) {}
+                        try {
+                            const inst = (bootstrap.Modal.getInstance && bootstrap.Modal.getInstance(modalElement))
+                                || (bootstrap.Modal.getOrCreateInstance && bootstrap.Modal.getOrCreateInstance(modalElement))
+                                || new bootstrap.Modal(modalElement);
+                            inst.hide();
+                        } catch (_) {}
+                        // 兜底
+                        try { window.apisixAdmin.closeChainModal(index); } catch (_) {}
+                    }, { once: false });
+                };
+                bindClose(headerCloseBtn);
+                bindClose(footerCloseBtn);
+            } catch (_) {}
+
+            // 关闭后清理DOM与遮罩，避免残留导致无法再次关闭
+            modalElement.addEventListener('hidden.bs.modal', function() {
+                try { this.remove(); } catch (e) {}
+                const backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) { backdrop.remove(); }
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('paddingRight');
+            });
 
             // 添加ESC键关闭功能
             const handleEscKey = (event) => {
@@ -3987,12 +4167,19 @@ class APISIXAdmin {
             // 尝试多种方式关闭模态框
             try {
                 // 方法1：尝试使用Bootstrap 5的getInstance方法
-                if (typeof bootstrap !== 'undefined' && bootstrap.Modal && typeof bootstrap.Modal.getInstance === 'function') {
-                    const modal = bootstrap.Modal.getInstance(modalElement);
-                    if (modal) {
-                        modal.hide();
-                        return;
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    let modal = null;
+                    if (typeof bootstrap.Modal.getInstance === 'function') {
+                        modal = bootstrap.Modal.getInstance(modalElement);
                     }
+                    if (!modal && typeof bootstrap.Modal.getOrCreateInstance === 'function') {
+                        modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+                    }
+                    if (!modal) {
+                        modal = new bootstrap.Modal(modalElement);
+                    }
+                    modal.hide();
+                    return;
                 }
                 
                 // 方法2：尝试使用jQuery（如果可用）
@@ -4014,6 +4201,8 @@ class APISIXAdmin {
                 
                 // 移除body的modal-open类
                 document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('paddingRight');
                 
             } catch (error) {
                 console.warn('关闭模态框失败，使用备用方案:', error);
@@ -4906,7 +5095,7 @@ class APISIXAdmin {
                                             <th class="sortable" data-sort="id" style="cursor: pointer;">证书ID <i class="mdi mdi-sort"></i></th>
                                             <th class="sortable" data-sort="snis" style="cursor: pointer;">SNI域名 <i class="mdi mdi-sort"></i></th>
                                             <th class="sortable" data-sort="expireAt" style="cursor: pointer;">到期时间 <i class="mdi mdi-sort"></i></th>
-                                            <th class="sortable" data-sort="status" style="cursor: pointer;">状态 <i class="mdi mdi-sort"></i></th>
+                                            <th class="sortable" data-sort="expireAt" style="cursor: pointer;">剩余天数 <i class="mdi mdi-sort"></i></th>
                                             <th class="sortable" data-sort="createTime" style="cursor: pointer;">创建时间 <i class="mdi mdi-sort"></i></th>
                                             <th style="width: 120px;">操作</th>
                                         </tr>
@@ -4961,22 +5150,7 @@ class APISIXAdmin {
                                             </div>
                                         </div>
 
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="mb-3">
-                                                    <label for="ssl-expireAt" class="form-label fw-bold">到期日期 <span class="text-danger">*</span></label>
-                                                    <input type="date" class="form-control" id="ssl-expireAt" required>
-                                                    <div class="form-text">证书有效期截止日期</div>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="form-check mb-3 mt-4">
-                                                    <input class="form-check-input" type="checkbox" id="ssl-enabled" checked>
-                                                    <label class="form-check-label fw-bold" for="ssl-enabled"><i class="mdi mdi-check-circle me-1"></i>创建后立即启用</label>
-                                                    <div class="form-text">创建后立即启用此证书</div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <div class="row"></div>
                                     </div>
                                 </div>
 
@@ -5060,28 +5234,27 @@ class APISIXAdmin {
         const current = items.slice(startIndex, endIndex);
 
         tbody.innerHTML = current.map(ssl => {
-            // 到期时间徽章颜色
+            // 从证书解析 notAfter
+            const expireDate = this.parseCertificateNotAfter(ssl.cert);
             const today = new Date();
-            const expireDate = new Date(ssl.expireAt);
-            const diffDays = Math.ceil((expireDate - today) / (1000 * 60 * 60 * 24));
+            const diffDays = expireDate ? Math.ceil((expireDate - today) / (1000 * 60 * 60 * 24)) : NaN;
             let expireBadge = 'bg-success';
-            if (diffDays <= 15 && diffDays >= 0) expireBadge = 'bg-warning';
-            if (diffDays < 0) expireBadge = 'bg-danger';
+            if (!isNaN(diffDays)) {
+                if (diffDays <= 15 && diffDays >= 0) expireBadge = 'bg-warning';
+                if (diffDays < 0) expireBadge = 'bg-danger';
+            }
 
             return `
                 <tr>
                     <td><code>${ssl.id}</code></td>
                     <td>${ssl.snis.map(s => `<span class="badge bg-light text-dark me-1">${s}</span>`).join('')}</td>
-                    <td><span class="badge ${expireBadge}">${ssl.expireAt}</span></td>
-                    <td>
-                        <span class="badge ${ssl.enabled ? 'bg-success' : 'bg-warning'}">${ssl.enabled ? '已启用' : '已禁用'}</span>
-                    </td>
+                    <td><span class="badge ${expireBadge}">${expireDate ? expireDate.toISOString().slice(0,10) : '-'}</span></td>
+                    <td><span class="badge ${expireBadge}">${isNaN(diffDays) ? '-' : (diffDays + ' 天')}</span></td>
                     <td>${ssl.createTime}</td>
                     <td>
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-outline-primary" onclick="window.apisixAdmin.editSSL('${ssl.id}')" title="编辑"><i class="mdi mdi-pencil"></i></button>
                             <button class="btn btn-outline-info" onclick="window.apisixAdmin.viewSSL('${ssl.id}')" title="预览"><i class="mdi mdi-eye"></i></button>
-                            <button class="btn btn-outline-${ssl.enabled ? 'warning' : 'success'}" onclick="window.apisixAdmin.toggleSSLStatus('${ssl.id}')" title="${ssl.enabled ? '禁用' : '启用'}"><i class="mdi mdi-${ssl.enabled ? 'pause' : 'play'}"></i></button>
                             <button class="btn btn-outline-danger" onclick="window.apisixAdmin.deleteSSL('${ssl.id}')" title="删除"><i class="mdi mdi-delete"></i></button>
                         </div>
                     </td>
@@ -5141,8 +5314,9 @@ class APISIXAdmin {
         const now = new Date();
         let valid = 0, expiring = 0, expired = 0;
         data.forEach(ssl => {
-            const d = new Date(ssl.expireAt);
-            const diff = Math.ceil((d - now) / (1000 * 60 * 60 * 24));
+            const expireDate = this.parseCertificateNotAfter(ssl.cert);
+            if (!expireDate) return; // 无法解析的不计入统计
+            const diff = Math.ceil((expireDate - now) / (1000 * 60 * 60 * 24));
             if (diff < 0) expired += 1;
             else if (diff <= 15) expiring += 1;
             else valid += 1;
@@ -5190,7 +5364,13 @@ class APISIXAdmin {
                 va = (a.snis || []).join(',');
                 vb = (b.snis || []).join(',');
             }
-            if (sortField === 'expireAt' || sortField === 'createTime') {
+            if (sortField === 'expireAt') {
+                // 兼容旧字段名，使用证书解析的过期时间排序
+                const da = this.parseCertificateNotAfter(a.cert) || new Date(0);
+                const db = this.parseCertificateNotAfter(b.cert) || new Date(0);
+                return (da - db) * (this.currentSortDirection === 'asc' ? 1 : -1);
+            }
+            if (sortField === 'createTime') {
                 return (new Date(va) - new Date(vb)) * (this.currentSortDirection === 'asc' ? 1 : -1);
             }
             if (typeof va === 'string') va = va.toLowerCase();
@@ -5227,7 +5407,6 @@ class APISIXAdmin {
         const form = document.getElementById('ssl-form');
         if (form) form.reset();
         document.getElementById('ssl-id').value = '';
-        document.getElementById('ssl-enabled').checked = true;
         const modal = new bootstrap.Modal(document.getElementById('sslModal'));
         modal.show();
     }
@@ -5238,10 +5417,9 @@ class APISIXAdmin {
         document.getElementById('sslModalLabel').innerHTML = '<i class="mdi mdi-pencil me-2"></i>编辑证书';
         document.getElementById('ssl-id').value = ssl.id;
         document.getElementById('ssl-snis').value = (ssl.snis || []).join(', ');
-        document.getElementById('ssl-expireAt').value = ssl.expireAt;
+        // 移除到期日期字段（从证书解析展示，不在表单中设置）
         document.getElementById('ssl-cert').value = ssl.cert || '';
         document.getElementById('ssl-key').value = ssl.key || '';
-        document.getElementById('ssl-enabled').checked = !!ssl.enabled;
         const modal = new bootstrap.Modal(document.getElementById('sslModal'));
         modal.show();
     }
@@ -5275,73 +5453,57 @@ class APISIXAdmin {
         document.getElementById('sslDetailsModal').addEventListener('hidden.bs.modal', function() { this.remove(); });
     }
 
-    toggleSSLStatus(sslId) {
-        const ssl = (this.sslData || []).find(s => s.id === sslId);
-        if (!ssl) { this.showNotification('证书不存在', 'error'); return; }
-        const newEnabled = !ssl.enabled;
-        const action = newEnabled ? '启用' : '禁用';
-        this.showConfirm(`确定要${action}证书 "${ssl.id}" 吗？`, () => {
-            ssl.enabled = newEnabled;
-            this.currentPage = 1;
-            this.displaySSLsWithPagination(this.sslData);
-            this.updateSSLsStats();
-            this.showNotification(`证书已${action}`, 'success');
-        });
-    }
+    // toggleSSLStatus 按钮移除
 
-    deleteSSL(sslId) {
+    async deleteSSL(sslId) {
         const ssl = (this.sslData || []).find(s => s.id === sslId);
         if (!ssl) { this.showNotification('证书不存在', 'error'); return; }
-        this.showConfirm(`确定要删除证书 "${ssl.id}" 吗？此操作不可恢复！`, () => {
-            this.sslData = (this.sslData || []).filter(s => s.id !== sslId);
-        
-        // 保存到本地存储
-        this.saveToStorage('ssl', this.sslData);
-        
-            this.currentPage = 1;
-            this.displaySSLsWithPagination(this.sslData);
-            this.updateSSLsStats();
-            this.showNotification('证书已删除', 'success');
+        this.showConfirm(`确定要删除证书 "${ssl.id}" 吗？此操作不可恢复！`, async () => {
+            try {
+                await this.apisixRequest(`/ssls/${sslId}`, { method: 'DELETE' });
+                const list = await this.getSSL();
+                this.sslData = this.validateAndNormalizeData(list, 'ssl') || [];
+                this.saveToStorage('ssl', this.sslData);
+                this.currentPage = 1;
+                this.displaySSLsWithPagination(this.sslData);
+                this.updateSSLsStats();
+                this.showNotification('证书已删除', 'success');
+            } catch (err) {
+                console.error('删除证书失败:', err);
+                this.showNotification('删除证书失败: ' + (err.message || '未知错误'), 'error');
+            }
         }, { confirmBtnClass: 'btn-danger', confirmText: '删除' });
     }
 
-    saveSSL() {
+    async saveSSL() {
         const form = document.getElementById('ssl-form');
         if (!form.checkValidity()) { form.reportValidity(); return; }
 
         const id = document.getElementById('ssl-id').value || `ssl-${Date.now()}`;
         const snis = document.getElementById('ssl-snis').value.split(',').map(s => s.trim()).filter(Boolean);
-        const expireAt = document.getElementById('ssl-expireAt').value;
         const cert = document.getElementById('ssl-cert').value.trim();
         const key = document.getElementById('ssl-key').value.trim();
-        const enabled = document.getElementById('ssl-enabled').checked;
-
-        const sslData = { id, snis, expireAt, cert, key, enabled, createTime: new Date().toLocaleString('zh-CN') };
-
-        const idx = (this.sslData || []).findIndex(s => s.id === id);
-        if (idx >= 0) {
-            this.sslData[idx] = { ...this.sslData[idx], ...sslData };
-            this.showNotification('证书已更新', 'success');
-        } else {
-            (this.sslData || (this.sslData = [])).push(sslData);
-            this.showNotification('证书已创建', 'success');
-        }
-
-        // 保存到本地存储
-        this.saveToStorage('ssl', this.sslData);
-
-        this.currentPage = 1;
-        this.displaySSLsWithPagination(this.sslData);
-        this.updateSSLsStats();
-
-        // 关闭模态框
-        const modalElement = document.getElementById('sslModal');
-        if (modalElement) {
-            modalElement.classList.remove('show');
-            modalElement.style.display = 'none';
-            document.body.classList.remove('modal-open');
-            const backdrop = document.querySelector('.modal-backdrop');
-            if (backdrop) backdrop.remove();
+        if (!snis.length || !cert || !key) { this.showNotification('请完善 SNI / 证书 / 私钥', 'warning'); return; }
+        try {
+            await this.apisixRequest(`/ssls/${id}`, { method: 'PUT', body: JSON.stringify({ snis, cert, key }) });
+            const list = await this.getSSL();
+            this.sslData = this.validateAndNormalizeData(list, 'ssl') || [];
+            this.saveToStorage('ssl', this.sslData);
+            this.currentPage = 1;
+            this.displaySSLsWithPagination(this.sslData);
+            this.updateSSLsStats();
+            this.showNotification('证书已保存并生效', 'success');
+            const modalElement = document.getElementById('sslModal');
+            if (modalElement) {
+                modalElement.classList.remove('show');
+                modalElement.style.display = 'none';
+                document.body.classList.remove('modal-open');
+                const backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) backdrop.remove();
+            }
+        } catch (err) {
+            console.error('保存证书失败:', err);
+            this.showNotification('保存证书失败: ' + (err.message || '未知错误'), 'error');
         }
     }
 
@@ -5407,7 +5569,7 @@ class APISIXAdmin {
         if (consumers.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="text-center text-muted py-4">
+                    <td colspan="10" class="text-center text-muted py-4">
                         <i class="mdi mdi-account-group mdi-24px"></i>
                         <p class="mt-2 mb-0">暂无消费者数据</p>
                     </td>
@@ -6359,7 +6521,7 @@ class APISIXAdmin {
         if (upstreams.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="text-center text-muted py-4">
+                    <td colspan="10" class="text-center text-muted py-4">
                         <i class="mdi mdi-server mdi-24px"></i>
                         <p class="mt-2 mb-0">暂无上游数据</p>
                     </td>
@@ -6808,7 +6970,8 @@ class APISIXAdmin {
 
             // 准备APISIX API数据格式
             const apisixData = {
-                key: upstreamData.id, // APISIX要求提供key字段
+                // 注意：APISIX Upstream 不需要也不接受把随机 ID 写入 key 字段
+                // key 仅在 type=chash 且需要指定哈希键时使用，并且必须符合变量命名规则
                 name: upstreamData.name, // 保留用户自定义的名称
                 type: upstreamData.loadBalancer,
                 scheme: determineScheme(upstreamData.nodes), // 自动判断协议
@@ -6824,6 +6987,15 @@ class APISIXAdmin {
                     weight: node.weight
                 }))
             };
+
+            // 仅在一致性哈希时设置哈希键，且提供一个合法的默认值（remote_addr）
+            if (upstreamData.loadBalancer === 'chash') {
+                // hash_on 可选值："vars" | "header" | "cookie" | "consumer"
+                // 这里默认对 vars 进行哈希
+                apisixData.hash_on = 'vars';
+                // 合法变量示例：remote_addr、uri、host、arg_xxx 等
+                apisixData.key = 'remote_addr';
+            }
             
             console.log('准备保存的上游数据:', apisixData);
             console.log('上游ID:', upstreamData.id);
@@ -8395,17 +8567,16 @@ class APISIXAdmin {
             <div class="col-xl-2 col-lg-2 col-md-3 col-sm-4 col-6 mb-4">
                 <div class="card h-100 border shadow-sm">
                     <div class="card-body d-flex flex-column align-items-start p-3">
-                        <div class="d-flex align-items-center w-100 mb-3">
+                        <div class="d-flex align-items-center w-100 mb-2">
                             <span class="badge bg-${p.color} mr-2">${this.getPlugin02CategoryLabel(p.category)}</span>
-                            <div class="ml-auto form-check form-switch">
-                                <input class="form-check-input" type="checkbox" ${p.enabled ? 'checked' : ''} onchange="window.apisixAdmin.togglePlugin02('${p.name}', this.checked)">
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="text-${p.color} me-4">
+                                <i class="mdi ${p.icon}" style="font-size: 2.5rem; margin-right: 1rem;"></i>
                             </div>
+                            <h6 class="card-title mb-0 fw-bold">${p.title || p.name}</h6>
                         </div>
-                        <div class="text-${p.color} mb-3">
-                            <i class="mdi ${p.icon} mdi-24px"></i>
-                        </div>
-                        <h5 class="mt-2 mb-2">${p.title || p.name}</h5>
-                        <p class="text-muted flex-grow-1 mb-3">${p.desc || ''}</p>
+                        <p class="text-muted flex-grow-1 mb-2" style="font-size: 0.9rem; line-height: 1.4;">${p.desc || ''}</p>
                         <div class="mt-auto w-100 d-flex justify-content-between">
                             <button class="btn btn-sm btn-link text-primary p-0 border-0 shadow-none" onclick="window.apisixAdmin.viewPlugin02('${p.name}')" 
                                 style="text-decoration: none; transition: all 0.2s ease; border-radius: 4px; padding: 4px 8px;" 
@@ -8524,7 +8695,7 @@ class APISIXAdmin {
                 </div>
             </div>
             ${templates.map(template => `
-                <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 mb-3">
+                <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 mb-3">
                     <div class="card border">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start mb-2">
@@ -8534,10 +8705,10 @@ class APISIXAdmin {
                             <h6 class="card-title mb-2" data-template-name="${template.name}">${template.name}</h6>
                             <p class="card-text text-muted small">${template.description || '无描述'}</p>
                             <div class="d-flex justify-content-between align-items-center">
-                                <button class="btn btn-sm btn-outline-primary" onclick="window.apisixAdmin.editPluginConfigTemplate('${template.id}')">
+                                <button class="btn btn-sm btn-link text-primary p-0 border-0 shadow-none" onclick="window.apisixAdmin.editPluginConfigTemplate('${template.id}')" style="text-decoration: none;">
                                     <i class="mdi mdi-pencil"></i> 编辑
                                 </button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="window.apisixAdmin.deletePluginConfigTemplate('${template.id}')">
+                                <button class="btn btn-sm btn-link text-danger p-0 border-0 shadow-none" onclick="window.apisixAdmin.deletePluginConfigTemplate('${template.id}')" style="text-decoration: none;">
                                     <i class="mdi mdi-delete"></i> 删除
                                 </button>
                             </div>
@@ -8628,15 +8799,7 @@ class APISIXAdmin {
         return defaultMap[cat] || 'mdi-puzzle';
     }
 
-    togglePlugin02(name, enabled) {
-        const found = this.allPlugins.find(p => p.name === name);
-        if (found) {
-            found.enabled = enabled;
-            // 保存插件启用状态到localStorage
 
-            this.showNotification(`${name} 已${enabled ? '启用' : '禁用'}`);
-        }
-    }
 
 
 
@@ -8710,13 +8873,16 @@ class APISIXAdmin {
             configDescription = document.getElementById('plugin02-description')?.value || '';
         } else {
             // 对于没有配置字段的插件，使用插件名称作为配置名称
-            // 使用安全的日期格式化，避免编码问题
+            // 使用时间戳确保唯一性，避免覆盖
             const now = new Date();
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const day = String(now.getDate()).padStart(2, '0');
-            const safeDate = `${year}-${month}-${day}`;
-            configName = `${name}-config-${safeDate}`;
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const timestamp = `${year}${month}${day}-${hours}${minutes}${seconds}`;
+            configName = `${name}-config-${timestamp}`;
             configDescription = `${plugin.title || plugin.name} configuration template`;
         }
         
@@ -8732,16 +8898,36 @@ class APISIXAdmin {
         );
         
         let configId, configTemplate;
-        if (existingTemplate) {
-            // 更新现有配置模板
-            configId = existingTemplate.id;
-            configTemplate = {
-                ...existingTemplate,
-                name: configName,
-                description: configDescription,
-                updated_at: new Date().toISOString()
-            };
-            console.log('更新现有配置模板:', configName);
+        if (existingTemplate && hasConfigFields) {
+            // 对于有配置字段的插件，如果存在同名配置，询问用户是否覆盖
+            const shouldOverwrite = confirm(`配置模板 "${configName}" 已存在，是否要覆盖？\n\n选择"确定"覆盖现有配置，选择"取消"创建新配置。`);
+            
+            if (shouldOverwrite) {
+                // 更新现有配置模板
+                configId = existingTemplate.id;
+                configTemplate = {
+                    ...existingTemplate,
+                    name: configName,
+                    description: configDescription,
+                    updated_at: new Date().toISOString()
+                };
+                console.log('更新现有配置模板:', configName);
+            } else {
+                // 用户选择不覆盖，创建新配置
+                const timestamp = Date.now();
+                configName = `${configName}-${timestamp}`;
+                configId = `config_${name}_${timestamp}`;
+                configTemplate = {
+                    id: configId,
+                    name: configName,
+                    plugin_name: name,
+                    description: configDescription,
+                    config: {},
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+                console.log('创建新配置模板:', configName);
+            }
         } else {
             // 创建新配置模板
             configId = `config_${name}_${Date.now()}`;
@@ -16101,6 +16287,11 @@ class APISIXAdmin {
             if (sortField === 'methods') {
                 aValue = a.methods ? a.methods.length : 0;
                 bValue = b.methods ? b.methods.length : 0;
+            } else if (sortField === 'hosts') {
+                const aHosts = Array.isArray(a.hosts) ? a.hosts.join(',') : (a.host || '');
+                const bHosts = Array.isArray(b.hosts) ? b.hosts.join(',') : (b.host || '');
+                aValue = aHosts;
+                bValue = bHosts;
             } else if (sortField === 'createTime') {
                 aValue = new Date(a.createTime);
                 bValue = new Date(b.createTime);
@@ -16147,7 +16338,7 @@ class APISIXAdmin {
             console.warn('displayRoutesWithPagination: routes参数无效:', routes);
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" class="text-center text-muted py-4">
+                    <td colspan="9" class="text-center text-muted py-4">
                         <i class="mdi mdi-routes mdi-24px"></i>
                         <p class="mt-2 mb-0">暂无路由数据</p>
                     </td>
@@ -16160,7 +16351,7 @@ class APISIXAdmin {
         if (routes.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" class="text-center text-muted py-4">
+                    <td colspan="9" class="text-center text-muted py-4">
                         <i class="mdi mdi-routes mdi-24px"></i>
                         <p class="mt-2 mb-0">暂无路由数据</p>
                     </td>
@@ -16187,6 +16378,11 @@ class APISIXAdmin {
                     </div>
                 </td>
                 <td><code>${route.uri || ''}</code></td>
+                <td>
+                    ${Array.isArray(route.hosts) && route.hosts.length > 0
+                        ? route.hosts.map(h => `<span class="badge bg-light text-dark me-1">${h}</span>`).join('')
+                        : (route.host ? `<span class="badge bg-light text-dark">${route.host}</span>` : '<span class="text-muted">未配置</span>')}
+                </td>
                 <td>
                     ${(route.methods && Array.isArray(route.methods) ? route.methods.map(method => `<span class="badge bg-light text-dark me-1">${method}</span>`).join('') : '<span class="text-muted">无</span>')}
                 </td>
@@ -16473,7 +16669,10 @@ class APISIXAdmin {
                         status: status,
                         createTime: routeData.create_time ? new Date(routeData.create_time * 1000).toLocaleString() : '',
                         updateTime: routeData.update_time ? new Date(routeData.update_time * 1000).toLocaleString() : '',
-                        plugins: routeData.plugins || {}
+                        plugins: routeData.plugins || {},
+                        // 保留并回显 host/hosts 字段
+                        host: routeData.host || undefined,
+                        hosts: Array.isArray(routeData.hosts) ? routeData.hosts : (routeData.host ? [routeData.host] : [])
                     };
                     
                     console.log('转换后的路由数据:', convertedRoute);
@@ -16507,6 +16706,8 @@ class APISIXAdmin {
         
         // 设置默认值
         document.getElementById('route-enabled').checked = true;
+        const hostsInput = document.getElementById('route-hosts');
+        if (hostsInput) hostsInput.value = '';
         
         // 设置HTTP方法默认值
         this.resetHttpMethodTags();
@@ -16567,6 +16768,11 @@ class APISIXAdmin {
         document.getElementById('route-service').value = route.service;
         document.getElementById('route-priority').value = route.priority;
         document.getElementById('route-desc').value = route.description || '';
+        const hostsInput2 = document.getElementById('route-hosts');
+        if (hostsInput2) {
+            const hostsValue = Array.isArray(route.hosts) ? route.hosts.join(', ') : (route.host || '');
+            hostsInput2.value = hostsValue;
+        }
         document.getElementById('route-enabled').checked = route.status === 'enabled';
         
         // 设置HTTP方法
@@ -16666,12 +16872,39 @@ class APISIXAdmin {
         const newStatus = route.status === 'enabled' ? 'disabled' : 'enabled';
         const action = newStatus === 'enabled' ? '启用' : '禁用';
         
-        this.showConfirm(`确定要${action}路由 "${route.name}" 吗？`, () => {
-            route.status = newStatus;
+        this.showConfirm(`确定要${action}路由 "${route.name}" 吗？`, async () => {
+            try {
+                // 调用 APISIX Admin API 持久化状态变更（部分更新）
+                await this.apisixRequest(`/routes/${routeId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ status: newStatus === 'enabled' ? 1 : 0 })
+                });
+                
+                this.showNotification(`路由已${action}（已同步到APISIX）`, 'success');
+                this.showNotification('正在刷新数据...', 'info');
+                
+                // 刷新路由数据，确保界面与后端一致
+                const freshRoutes = await this.getRoutes();
+                if (freshRoutes && Array.isArray(freshRoutes)) {
+                    const normalizedRoutes = this.validateAndNormalizeData(freshRoutes, 'routes');
+                    this.routesData = normalizedRoutes;
+                    this.saveToStorage('routes', this.routesData);
                     this.currentPage = 1;
-        this.displayRoutesWithPagination(this.routesData);
-        this.updateRoutesStats();
-            this.showNotification(`路由已${action}`, 'success');
+                    this.displayRoutesWithPagination(this.routesData);
+                    this.updateRoutesStats();
+                } else {
+                    // 后端刷新失败则回退为本地更新
+                    route.status = newStatus;
+                    this.currentPage = 1;
+                    this.displayRoutesWithPagination(this.routesData);
+                    this.updateRoutesStats();
+                    this.showNotification('数据刷新失败，已更新本地状态', 'warning');
+                }
+            } catch (error) {
+                console.error('切换路由状态失败:', error);
+                console.error('错误详情:', { method: 'PATCH', url: `/routes/${routeId}`, error: error.message });
+                this.showNotification(`路由${action}失败: ` + error.message, 'error');
+            }
         });
     }
     
@@ -16770,6 +17003,15 @@ class APISIXAdmin {
             status: document.getElementById('route-enabled').checked ? 'enabled' : 'disabled',
             createTime: new Date().toLocaleString('zh-CN')
         };
+
+        // 读取可选的 hosts/host
+        const rawHosts = (document.getElementById('route-hosts') && document.getElementById('route-hosts').value) ? document.getElementById('route-hosts').value.trim() : '';
+        if (rawHosts) {
+            const hosts = rawHosts.split(',').map(s => s.trim()).filter(Boolean);
+            if (hosts.length > 0) {
+                routeData.hosts = hosts;
+            }
+        }
         
         // 验证必填字段
         if (!routeData.name || routeData.name.trim() === '') {
@@ -16820,6 +17062,15 @@ class APISIXAdmin {
                 desc: routeData.description || routeData.name,
                 status: routeData.status === 'enabled' ? 1 : 0
             };
+
+            // 写入可选的 host/hosts（兼容仅支持单数 host 的后端）
+            if (routeData.hosts && Array.isArray(routeData.hosts) && routeData.hosts.length > 0) {
+                if (routeData.hosts.length === 1) {
+                    apisixData.host = routeData.hosts[0];
+                } else {
+                    apisixData.hosts = routeData.hosts;
+                }
+            }
             
             // 如果选择了服务，添加服务ID
             if (routeData.service && routeData.service.trim() !== '') {
@@ -17659,47 +17910,39 @@ class APISIXAdmin {
                             <div class="row">
                                 <div class="col-md-3">
                                     <div class="sticky-top" style="top: 1rem;">
-                                        <!-- 搜索框 -->
-                                        <div class="mb-3">
-                                            <div class="input-group">
-                                                <input type="text" class="form-control" id="plugin-search" placeholder="搜索插件..." style="font-size: 0.9rem;">
-                                                <button class="btn btn-outline-secondary" type="button" id="plugin-search-btn">
-                                                    <i class="mdi mdi-magnify"></i>
-                                                </button>
-                                            </div>
-                                        </div>
+
                                         
                                         <!-- 分类筛选 -->
                                         <div class="list-group" id="plugin-categories">
                                             <button class="list-group-item list-group-item-action active" data-category="all">
-                                                <i class="mdi mdi-puzzle me-2"></i>全部插件
+                                                <i class="mdi mdi-puzzle" style="margin-right: 1rem !important;"></i>全部插件
                                             </button>
                                             <button class="list-group-item list-group-item-action" data-category="ai">
-                                                <i class="mdi mdi-robot me-2"></i>AI插件
+                                                <i class="mdi mdi-robot" style="margin-right: 1rem !important;"></i>AI插件
                                             </button>
                                             <button class="list-group-item list-group-item-action" data-category="auth">
-                                                <i class="mdi mdi-key me-2"></i>认证插件
+                                                <i class="mdi mdi-key" style="margin-right: 1rem !important;"></i>认证插件
                                             </button>
                                             <button class="list-group-item list-group-item-action" data-category="security">
-                                                <i class="mdi mdi-shield-outline me-2"></i>安全插件
+                                                <i class="mdi mdi-shield-outline" style="margin-right: 1rem !important;"></i>安全插件
                                             </button>
                                             <button class="list-group-item list-group-item-action" data-category="traffic">
-                                                <i class="mdi mdi-speedometer me-2"></i>流量控制插件
+                                                <i class="mdi mdi-speedometer" style="margin-right: 1rem !important;"></i>流量控制插件
                                             </button>
                                             <button class="list-group-item list-group-item-action" data-category="observe">
-                                                <i class="mdi mdi-chart-bar me-2"></i>可观测性插件
+                                                <i class="mdi mdi-chart-bar" style="margin-right: 1rem !important;"></i>可观测性插件
                                             </button>
                                             <button class="list-group-item list-group-item-action" data-category="log">
-                                                <i class="mdi mdi-file-document me-2"></i>日志插件
+                                                <i class="mdi mdi-file-document" style="margin-right: 1rem !important;"></i>日志插件
                                             </button>
                                             <button class="list-group-item list-group-item-action" data-category="transform">
-                                                <i class="mdi mdi-sync me-2"></i>转换插件
+                                                <i class="mdi mdi-sync" style="margin-right: 1rem !important;"></i>转换插件
                                             </button>
                                             <button class="list-group-item list-group-item-action" data-category="general">
-                                                <i class="mdi mdi-cog me-2"></i>通用插件
+                                                <i class="mdi mdi-cog" style="margin-right: 1rem !important;"></i>通用插件
                                             </button>
                                             <button class="list-group-item list-group-item-action" data-category="other">
-                                                <i class="mdi mdi-dots-horizontal me-2"></i>其他插件
+                                                <i class="mdi mdi-dots-horizontal" style="margin-right: 1rem !important;"></i>其他插件
                                             </button>
                                         </div>
                                     </div>
@@ -17745,8 +17988,6 @@ class APISIXAdmin {
     bindPluginSelectorEvents(modalId, targetType, targetId, callback) {
         const categoryButtons = document.querySelectorAll(`#${modalId} #plugin-categories button`);
         const pluginList = document.querySelector(`#${modalId} #plugin-list`);
-        const searchInput = document.querySelector(`#${modalId} #plugin-search`);
-        const searchBtn = document.querySelector(`#${modalId} #plugin-search-btn`);
 
         // 分类筛选
         categoryButtons.forEach(btn => {
@@ -17759,22 +18000,7 @@ class APISIXAdmin {
             });
         });
 
-        // 搜索功能
-        if (searchInput) {
-            searchInput.addEventListener('input', async (e) => {
-                const searchTerm = e.target.value.trim();
-                const activeCategory = document.querySelector(`#${modalId} #plugin-categories .active`).dataset.category;
-                await this.renderPluginList(pluginList, activeCategory, searchTerm);
-            });
-        }
 
-        if (searchBtn) {
-            searchBtn.addEventListener('click', async () => {
-                const searchTerm = searchInput ? searchInput.value.trim() : '';
-                const activeCategory = document.querySelector(`#${modalId} #plugin-categories .active`).dataset.category;
-                await this.renderPluginList(pluginList, activeCategory, searchTerm);
-            });
-        }
 
         // 初始渲染
         this.renderPluginList(pluginList, 'all', '');
@@ -17853,18 +18079,20 @@ class APISIXAdmin {
                 <div class="card border h-100">
                     <div class="card-body p-3">
                         <div class="d-flex align-items-center mb-2">
-                            <div class="text-${plugin.color} me-2">
-                                <i class="mdi ${plugin.icon} mdi-18px"></i>
+                            <div class="text-${plugin.color}" style="margin-right: 0.5rem !important;">
+                                <i class="mdi ${plugin.icon}" style="font-size: 2rem;"></i>
                             </div>
-                            <h6 class="card-title mb-1 small">${plugin.title || plugin.name}</h6>
-                                <span class="badge bg-success ms-auto" title="配置模板数量">${templateCount}</span>
+                            <div class="flex-grow-1 d-flex justify-content-between align-items-center">
+                                <h6 class="card-title mb-0 fw-bold">${plugin.title || plugin.name}</h6>
+                                <span class="badge bg-success" title="配置模板数量">${templateCount}</span>
+                            </div>
                         </div>
-                        <p class="card-text small text-muted mb-2" style="font-size: 0.8rem;">${plugin.desc || ''}</p>
-                        <div class="d-flex gap-1">
-                            <button class="btn btn-sm btn-outline-primary btn-sm" onclick="window.apisixAdmin.selectPluginForTarget('${plugin.name}', '${targetType}', null)" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                        <p class="card-text text-muted mb-2" style="font-size: 0.9rem; line-height: 1.5;">${plugin.desc || ''}</p>
+                        <div class="d-flex" style="gap: 0.5rem !important;">
+                            <button class="btn btn-sm btn-outline-primary" onclick="window.apisixAdmin.selectPluginForTarget('${plugin.name}', '${targetType}', null)" style="font-size: 0.7rem !important; padding: 0.25rem 0.5rem !important;">
                                 选择
                             </button>
-                            <button class="btn btn-sm btn-outline-info btn-sm" onclick="window.apisixAdmin.viewPluginConfig('${plugin.name}')" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">
+                            <button class="btn btn-sm btn-outline-info" onclick="window.apisixAdmin.viewPluginConfig('${plugin.name}')" style="font-size: 0.7rem !important; padding: 0.25rem 0.5rem !important;">
                                 查看
                             </button>
                         </div>
